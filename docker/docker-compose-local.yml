@@ -1,0 +1,134 @@
+services: 
+  web:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: arthub_web
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - static_volume:/staticfiles:ro
+      - media_volume:/app/media
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_HOST=db
+      - DB_PORT=5432
+    networks:
+      - arthub
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - redis
+
+  static-init:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    volumes:
+      - static_volume:/staticfiles  # Монтируем на /staticfiles где Django ожидает
+      - media_volume:/app/media
+    env_file:
+      - ./.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      - db
+    networks:
+      - arthub
+    user: "0:0"  # Запускаем как root для создания директорий и установки прав
+    restart: "no"
+
+  db:
+    image: postgres:16
+    container_name: arthub_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-artsite}
+      POSTGRES_USER: ${POSTGRES_USER:-artuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - arthub
+    env_file:
+      - ./.env
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: arthub_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - arthub
+
+  celery-worker:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: arthub_worker
+    volumes:
+      - media_volume:/app/media
+    env_file:
+      - ./.env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      - web
+    networks:
+      - arthub
+    restart: always
+    command: >
+      sh -c "
+        echo '⚙️ Starting Celery worker...' &&
+        celery -A ArtisanHub worker -l info
+      "
+
+  celery-beat:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: arthub_celery_beat
+    volumes:
+      - media_volume:/app/media
+    env_file:
+      - ./.env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      - web
+    networks:
+      - arthub
+    restart: always
+    command: >
+      sh -c "
+        echo '📅 Starting Celery beat scheduler...' &&
+        celery -A ArtisanHub beat -l info
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+
+networks:
+  arthub:
+    driver: bridge
+
