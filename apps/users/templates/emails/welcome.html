@@ -1,0 +1,22 @@
+{% extends 'emails/base.html' %}
+
+{% block title %}Добро пожаловать в ArtisanHub!{% endblock %}
+
+{% block header_title %}Добро пожаловать!{% endblock %}
+
+{% block content %}
+    <h2>Привет, {{ user.first_name }}!</h2>
+    <p>Спасибо за регистрацию в системе <strong>ArtisanHub</strong>!</p>
+    <p>Ваш аккаунт успешно создан:</p>
+    
+    <div class="info-box primary">
+        <strong>Email:</strong> {{ user.email }}<br>
+        <strong>Имя:</strong> {{ user.first_name }} {{ user.last_name }}<br>
+        <strong>Дата регистрации:</strong> {{ user.date_joined|date:"d.m.Y H:i" }}
+    </div>
+    
+    <p>Теперь вы можете войти в систему, используя свои учетные данные.</p>
+    <p class="footer-text">
+        Это автоматическое сообщение, не отвечайте на него.
+    </p>
+{% endblock %}

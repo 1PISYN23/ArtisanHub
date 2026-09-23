@@ -18,7 +18,8 @@ RUN pip install setuptools
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Создание непривилегированного пользователя с определенным UID/GID
-RUN groupadd -r appuser -g 1000 && useradd -r -g appuser -u 1000 appuser
+RUN groupadd -r appuser -g 1000 && \
+    useradd -m -r -g appuser -u 1000 appuser
 
 # Копирование исходного кода
 COPY . .
@@ -35,4 +36,4 @@ USER appuser
 EXPOSE 8000
 
 # Команда по умолчанию
-CMD ["gunicorn", "ArtisanHub.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "ArtisanHub.wsgi:application", "--bind", "0.0.0.0:8000"]

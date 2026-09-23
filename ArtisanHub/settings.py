@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-os.getenv('SECRET_KEY')
+
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
@@ -25,17 +25,21 @@ THIRD_PATRY_APPS = [
     'rest_framework',
     'corsheaders',
     'django_filters',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular'
 ]
 
 LOCAL_APPS = [
-
+    'apps.users',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PATRY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -44,6 +48,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 ROOT_URLCONF = 'ArtisanHub.urls'
 
@@ -96,41 +109,55 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# Static files
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = BASE_DIR / os.getenv('STATIC_ROOT', default='staticfiles')
 
+
+# Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / os.getenv('MEDIA_ROOT', default='media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model - указываем нашего кастомную модель, как основную
-# AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'users.CustomUser'
 
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-else:
-    CORS_ALLOW_ALL_ORIGINS = [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-    ]
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Укажите порт, на котором работает ваш Vue.js
+    "http://127.0.0.1:5173",
+]
 
+# REST Framework Configuration
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-    },
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'password_reset_anon': '3/hour',
+        'verification_anon': '5/hour'
+    }
 }
 
 # JWT Configuration
@@ -148,6 +175,42 @@ SIMPLE_JWT = {
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
+}
+
+# DRF Spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ArtisanHub API',
+    'DESCRIPTION': 'API для системы ArtisanHub',
+    'VERSION': '1.1.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SERVERS': [
+        {
+            'url': 'http://localhost:8000/api/v1',
+            'description': 'Local development server'
+        }
+    ],
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+    'SCHEMA_PATH_PREFIX_TRIM': True,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'SERVE_AUTHENTICATION': [],
+    # Настройки для примеров
+    'ENUM_NAME_OVERRIDES': {},
+    'POSTPROCESSING_HOOKS': [],
+    'PREPROCESSING_HOOKS': [],
+    'SORT_OPERATIONS': True,
+    'SORT_OPERATION_PARAMETERS': True,
+    'GENERIC_ADDITIONAL_PROPERTIES': True,
+    'ENUM_ADDITIONAL_PROPERTIES': True,
+    'SCHEMA_COERCE_PATH_PK': True,
+    'SCHEMA_COERCE_PATH_PK_SUFFIX': True,
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
+    'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Настройки тегов для группировки
+    'TAGS': [
+        {'name': 'auth', 'description': 'Аутентификация и авторизация'},
+    ],
 }
 
 # Настройки безопасности
@@ -217,7 +280,7 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', default=587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='noreply@newssite.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='kombatez@mail.ru')
 
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
