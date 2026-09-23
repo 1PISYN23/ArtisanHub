@@ -7,6 +7,11 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ArtisanHub.settings')
+
+    if os.getenv("DJANGO_DEBUGPY") == "1":
+        import debugpy
+        debugpy.listen(("0.0.0.0", 5678))
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

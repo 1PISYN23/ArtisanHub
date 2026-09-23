@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Meridian{% endblock %}</title>
+    <style>
+        .email-container {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            color: white;
+            margin: 0;
+        }
+        .email-content {
+            padding: 30px;
+            background: #f9f9f9;
+        }
+        .email-content h2 {
+            color: #333;
+        }
+        .email-content h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .info-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-box.primary {
+            border-left: 4px solid #667eea;
+        }
+        .info-box.success {
+            border-left: 4px solid #28a745;
+        }
+        .info-box.warning {
+            border-left: 4px solid #ffc107;
+        }
+        .info-box.danger {
+            border-left: 4px solid #ff6b6b;
+        }
+        .code-display {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+            border: 2px solid #667eea;
+        }
+        .code-display h1 {
+            color: #667eea;
+            font-size: 32px;
+            letter-spacing: 8px;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+        }
+        .message-text {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: Arial, sans-serif;
+        }
+        .footer-text {
+            color: #666;
+            font-size: 14px;
+        }
+        .email-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            background: white;
+            font-size: 14px;
+        }
+        .email-table th,
+        .email-table td {
+            border: 1px solid #e0e0e0;
+            padding: 8px 10px;
+            text-align: left;
+        }
+        .email-table th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>{% block header_title %}ArtisanHub{% endblock %}</h1>
+        </div>
+        <div class="email-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>
