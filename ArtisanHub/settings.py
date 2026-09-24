@@ -40,7 +40,6 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -155,8 +154,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
-        'password_reset_anon': '3/hour',
-        'verification_anon': '5/hour'
+        'password_reset_anon': '3/hour'
     }
 }
 
@@ -210,6 +208,7 @@ SPECTACULAR_SETTINGS = {
     # Настройки тегов для группировки
     'TAGS': [
         {'name': 'auth', 'description': 'Аутентификация и авторизация'},
+        {'name': "verification", "description": 'Верификация email и коды подтверждения'}
     ],
 }
 
@@ -251,7 +250,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'apps.main': {
+        'apps.users': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
             'propagate': False,
@@ -280,7 +279,7 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', default=587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='kombatez@mail.ru')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='noreply@artisanhub.local')
 
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')

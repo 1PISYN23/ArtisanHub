@@ -1,9 +1,11 @@
+import logging
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from .models import CustomUser
 
+logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_email_code_verification(self, user_id, purpose, code):
@@ -15,6 +17,10 @@ def send_email_code_verification(self, user_id, purpose, code):
         subject = "Код подтверждения для смены пароля"
         title = "Смена пароля"
         message = "Для смены пароля введите следующий код подтверждения:"
+    else:
+        subject = "Код подтверждения"
+        title = "Подтверждение"
+        message = "Введите следующий код подтверждения:"
 
     try:
         user = CustomUser.objects.get(id=user_id)
@@ -44,6 +50,7 @@ def send_welcome_email(user_id):
     try:
         user = CustomUser.objects.get(id=user_id)
     except Exception as e:
+        logging.warning("Что-то пошло не так при отправке приветсвенного email.")
         return 
 
     body_html = render_to_string("emails/welcome.html", {
