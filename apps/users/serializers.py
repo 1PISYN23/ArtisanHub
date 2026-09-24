@@ -115,7 +115,7 @@ class VerifyVerificationCodeSerizlier(serializers.Serializer):
         try:
             VerificationCodeService.verify_verification_code(user, code)
         except ValidationError as e:
-            raise serializers.ValidationError({"code": "Неверный код"})
+            raise serializers.ValidationError({"code": str(e)})
 
         return attrs
 
@@ -181,9 +181,10 @@ class VerifyPasswordResetSerializer(serializers.Serializer):
     
 
     def validate(self, attrs):
+        email = attrs.get("email")
         code = attrs.get("code")
 
-        user = self.context.get("request").user
+        user = CustomUser.objects.get(email=email)
 
         try:
             VerificationCodeService.verify_password_reset_code(user, code)

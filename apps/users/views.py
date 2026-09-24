@@ -1,3 +1,4 @@
+import logging
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -23,6 +24,8 @@ from .serializers import (
     UpdateUserProfileSerizlier,
     LogoutSerializer
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _tokens_for(user):
@@ -229,7 +232,7 @@ def send_password_reset_code_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verifiy_password_reset_code(request):
-    serializer = VerifyPasswordResetSerializer(data=request.data, context={"request": request})
+    serializer = VerifyPasswordResetSerializer(data=request.data)
 
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -459,11 +462,12 @@ def deactivate_accoint_view(request):
         outstanding_tokens = OutstandingToken.objects.filter(user=user)
         for outstanding_token in outstanding_tokens:
             try:
-                refresh_token = RefreshToken(outstanding_token)
+                refresh_token = RefreshToken(outstanding_token.token)
                 refresh_token.blacklist()
             except Exception:
                 pass
     except Exception:
+        logger.warning("Что то пошло не так во время деактивации аккаунта")
         pass
 
     return Response({
