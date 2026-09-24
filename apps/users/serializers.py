@@ -103,62 +103,19 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class SendVerificationCodeSerizlier(serializers.Serializer):
-    email = serializers.EmailField(required=True, help_text="Email адрес для отправки кода регистрации")
 
+class VerifyVerificationCodeSerizlier(serializers.Serializer):
+    code = serializers.CharField(required=True, min_length=6, max_length=6)
 
-    def validate(self, attrs):
-        email = attrs.get("email")
-
-        if email:
-            email = email.lower().strip()
-            attrs["email"] = email
-
-        if not CustomUser.objects.filter(email=email).exists():
-            raise serializers.ValidationError(
-                "Пользователь с указанными данными не найден."
-            )
-
-        return attrs
-
-
-class VerifyCodeSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    code = serializers.CharField(max_length=6, min_length=6)
-
-
-    def validate_email(self, value):
-        if value:
-            value = value.lower().strip()
-        return value
-
-
-    def get_user_or_fail(self):
-        email = self.initial_data.get("email")
-
-        if not email:
-            raise serializers.ValidationError({
-                "code": "Неверный код"
-            })
-        try:
-            user = CustomUser.objects.get(email=email)
-            return user
-        except CustomUser.DoesNotExist:
-            raise serializers.ValidationError(
-                {"code": "Неверный код"}
-            )
-
-
-class VerifyVerificationCodeSerizlier(VerifyCodeSerializer):
     def validate(self, attrs):
         code = attrs.get("code")
 
-        user = self.get_user_or_fail()
+        user = self.context.get("request").user
 
         try:
             VerificationCodeService.verify_verification_code(user, code)
-        except Exception as e:
-            raise serializers.ValidationError({"code": "Неверный код код"})
+        except ValidationError as e:
+            raise serializers.ValidationError({"code": "Неверный код"})
 
         return attrs
 
@@ -207,15 +164,30 @@ class SendPasswordResetCodeSerializer(serializers.Serializer):
         return value
    
 
-class VerifyPasswordResetSerializer(VerifyCodeSerializer):
+class VerifyPasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, min_length=6, max_length=6)
+
+
+    def validate_email(self, value):
+        if value:
+            value = value.lower().strip()
+
+        if not CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError({
+                "code": "Неверный код"
+            })
+        return value
+    
+
     def validate(self, attrs):
         code = attrs.get("code")
 
-        user = self.get_user_or_fail()
+        user = self.context.get("request").user
 
         try:
             VerificationCodeService.verify_password_reset_code(user, code)
-        except Exception as e:
+        except ValidationError as e:
             raise serializers.ValidationError({"code": str(e)})
 
         return attrs
