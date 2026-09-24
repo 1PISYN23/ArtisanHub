@@ -2,12 +2,11 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiExample
-from .throttling import PasswordResetAnon, VerificationAnon
+from .throttling import PasswordResetAnon
 
 from .service import VerificationCodeService
 
@@ -15,8 +14,6 @@ from .models import CustomUser
 from .serializers import (
     CustomTokenObtainPairSerizlier,
     UserRegistrationSerializer,
-    SendVerificationCodeSerizlier,
-    VerifyCodeSerializer,
     VerifyVerificationCodeSerizlier,
     SendPasswordResetCodeSerializer,
     VerifyPasswordResetSerializer,
@@ -53,24 +50,6 @@ def _tokens_for(user):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerizlier
     permission_classes = [AllowAny]
-
-
-@extend_schema(
-    summary="Обновление токена",
-    description="Обновление access токена с помощью refresh токена",
-    tags=["auth"],
-    request=TokenRefreshSerializer,
-    responses={
-
-    }
-)
-class CustomTokenRefreshView(TokenRefreshView):
-    serializer_class = TokenRefreshSerializer
-    permission_classes = [AllowAny]
-
-
-    def post(self, request, *args, **kwargs):
-        pass
 
 
 @extend_schema(
@@ -120,7 +99,7 @@ class RegisterView(generics.CreateAPIView):
     summary="Отправка кода регистрации",
     description="Отправка кода регистрации для верификации email. Код действителен 5 минут.",
     tags=["verification"],
-    request=SendVerificationCodeSerizlier,
+    request=None,
     responses={
         200: OpenApiResponse(
             description="Успешная отправка кода на email"
@@ -135,22 +114,14 @@ class RegisterView(generics.CreateAPIView):
 )
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-@throttle_classes([VerificationAnon])
 def send_verification_code_view(request):
-    serializer = SendVerificationCodeSerizlier(data=request.data)
+    user = request.user
 
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    email = serializer.validated_data["email"]
-
-    try:
-        user = CustomUser.objects.get(email=email)
-    except CustomUser.DoesNotExist:
+    if user.is_email_verified:
         return Response({
-            "error": "Ошибка валидации данных"
+            "error": "Ваш email уже верифицирован"
         }, status=status.HTTP_400_BAD_REQUEST)
-
+    
     try:
         VerificationCodeService.send_verification_code(user)
 
@@ -182,7 +153,7 @@ def send_verification_code_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_verification_code_view(request):
-    serizlier = VerifyVerificationCodeSerizlier(data=request.data)
+    serizlier = VerifyVerificationCodeSerizlier(data=request.data, context={"request": request})
 
     if not serizlier.is_valid():
         return Response(serizlier.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -258,7 +229,7 @@ def send_password_reset_code_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verifiy_password_reset_code(request):
-    serializer = VerifyPasswordResetSerializer(data=request.data)
+    serializer = VerifyPasswordResetSerializer(data=request.data, context={"request": request})
 
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -500,5 +471,3 @@ def deactivate_accoint_view(request):
     }, status=status.HTTP_200_OK)
 
 
-
-# + такой вопрос, я могу прописать отдельный endpont на изменение профиля пользователя и сделать также функционально, или оставить так как есть? 

@@ -1,7 +1,7 @@
 from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView,
-    TokenRefreshView,
     RegisterView,
     send_verification_code_view,
     verify_verification_code_view,
