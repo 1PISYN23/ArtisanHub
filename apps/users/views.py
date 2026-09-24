@@ -232,7 +232,7 @@ def send_password_reset_code_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verifiy_password_reset_code(request):
-    serializer = VerifyPasswordResetSerializer(data=request.data)
+    serializer = VerifyPasswordResetSerializer(data=request.data, context={"request": request})
 
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
