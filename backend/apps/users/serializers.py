@@ -69,7 +69,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ["email", "first_name", "last_name", "phone", "password", "password_confirm"]
+        fields = ["email", "first_name", "last_name", "phone", "password", "password_confirm", "personal_data_consent", "marketing_consent"]
 
 
     def validate_email(self, value):
@@ -85,11 +85,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         password = attrs.get("password")
         password_confirm = attrs.get("password_confirm")
+        personal_data_consent = attrs.get("personal_data_consent")
 
         if password != password_confirm:
             raise serializers.ValidationError(
                 "Пароли не совпадают."
             )
+
+        if not personal_data_consent:
+            raise serializers.ValidationError(
+                "Требется согласие на пользовательское соглшение."
+            )
+
         return attrs
 
 
@@ -184,7 +191,12 @@ class VerifyPasswordResetSerializer(serializers.Serializer):
         email = attrs.get("email")
         code = attrs.get("code")
 
-        user = CustomUser.objects.get(email=email)
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError(
+                {"code": "Неверный код"}
+            )
 
         try:
             VerificationCodeService.verify_password_reset_code(user, code)

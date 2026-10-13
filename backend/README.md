@@ -306,26 +306,163 @@ PromoCode (shop nullable, code, discount_type, value, valid_from, valid_to, usag
 - `requirements.txt` содержит только реально используемые пакеты.
 
 ### Этап 1 — Каталог (детально)
-- `apps/accounts`: модель `User`/`Shop` (решение из 0.2), регистрация,
-  JWT-логин/рефреш, эндпоинт "стать продавцом" (создать `Shop` для текущего
-  юзера) — реши, может ли у одного юзера быть больше одного магазина
-  (скорее нет — `OneToOneField`).
-- `apps/catalog`: `Category` (self-FK `parent`, `slug` уникальный),
-  `Product`, `ProductVariant`, `ProductImage`.
-- Продумай **владение**: `IsShopOwnerOrReadOnly` permission — продавец может
-  редактировать только товары своего магазина. Напиши тест, который явно
-  проверяет, что чужой продавец получает 403, а не просто "код работает".
-- Список товаров: `django-filter` (уже в зависимостях) для фильтров по
-  категории/цене/наличию, `OrderingFilter` для сортировки, пагинация
-  `PageNumberPagination` с ограничением `max_page_size`.
-- **Проверка себя:** установи `django-debug-toolbar` в dev, открой список
-  из 20+ товаров с изображениями и вариантами, посчитай число SQL-запросов
-  до и после `select_related('shop', 'category').prefetch_related('images',
-  'variants')`. Разница должна быть заметной (условно с ~60 запросов до ~4).
-  Это не абстрактное упражнение — без него любой список в проекте будет
-  тормозить на реальных данных.
-- Подключи `drf-spectacular` прямо сейчас, не откладывай — это и документация
-  для тебя, и контракт, по которому я буду собирать фронт (см. раздел 0.1).
+
+По факту `apps/users` (Auth/`CustomUser`) у тебя уже готов с этапа 0 — этот
+этап про два новых приложения: `apps/shops` (модель `Shop`, как договорились —
+отдельно от `users`) и `apps/catalog` (сам каталог товаров).
+
+#### 1.1 `apps/shops` — сначала это, каталог без него бессмысленен
+- Модель `Shop` — код и обоснование полей смотри в переписке про
+  `OneToOneField(CustomUser)`, `slug` с авто-генерацией и проверкой на
+  уникальность, `rating_cached`/`reviews_count_cached`, `stripe_account_id`
+  (пока просто поле, заполнять начнёшь на этапе 4).
+- Эндпоинт "стать продавцом": `POST /api/v1/shops/` — создаёт `Shop` для
+  `request.user`, если у него его ещё нет (`if hasattr(request.user, "shop")`
+  → 400 "У вас уже есть магазин"). Публичный `GET /api/v1/shops/<slug>/` —
+  витрина магазина (потребуется на фронте карточка продавца).
+- `permissions.py`: `IsShopOwner` — для эндпоинтов редактирования самого
+  магазина (`PATCH /shops/me/` — обнови описание/логотип). Отдельно заведи
+  `IsShopOwnerOrReadOnly` — он понадобится в `apps/catalog`, но логичнее
+  держать его здесь же, рядом с `Shop`, а не размазывать по каталогу.
+
+#### 1.2 `apps/catalog` — модели
+```
+Category(parent: self FK nullable, name, slug unique, order)
+Product(shop FK, category FK, title, slug, description, base_price, is_published, created_at)
+ProductVariant(product FK, sku unique, attributes: JSONField, price_override nullable, stock, is_default)
+ProductImage(product FK, image, order, alt_text)
+```
+Детали, которые стоит продумать заранее, а не по ходу:
+- **`attributes` как `JSONField`, а не отдельные колонки `size`/`color`.**
+  У разных категорий товаров разные атрибуты (у украшения — материал и
+  размер, у открытки — вообще ничего). Жёсткие колонки заставят тебя либо
+  плодить NULL-поля на 90% товаров, либо городить EAV-таблицы. JSONField —
+  осознанный компромисс: теряешь возможность фильтровать по атрибуту на
+  уровне БД-индекса "из коробки" (это уже про Postgres `GIN`-индекс на
+  JSONB, отдельная тема, не обязательна на этом этапе), выигрываешь в
+  гибкости модели. Для MVP этого достаточно.
+- **`price_override` на варианте, а `base_price` на товаре** — цена варианта
+  необязательна: если у товара один вариант или варианты не отличаются по
+  цене, `price_override=None` → используется `base_price` товара. Реши,
+  где будет метод `get_effective_price()` — логично на `ProductVariant`,
+  чтобы сериализатор не дублировал `variant.price_override or product.base_price`
+  в нескольких местах.
+- **`is_default` на варианте** — когда на витрине показываешь карточку
+  товара со списком, а не детальную страницу, нужно показать одну цену/
+  одно фото — бери `is_default=True` вариант. На уровне модели добавь
+  `save()`-логику или `signal`, гарантирующую, что у товара всегда ровно
+  один вариант с `is_default=True` (либо валидацию в сериализаторе — но
+  на уровне модели надёжнее, раз варианты могут создаваться и не только
+  через API, а например через админку или management-команду).
+- **Остатки (`stock`) — уже сейчас думай о том, что списание будет
+  атомарным на этапе 3.** Здесь, на этапе 1, просто поле
+  `stock = PositiveIntegerField(default=0)`, ничего специального. Но
+  заведи в голове: **не делай** `stock` вычисляемым полем на лету через
+  агрегацию заказов — это должно быть хранимое значение, которое
+  уменьшается транзакционно при заказе (иначе на этапе 3 придётся
+  мигрировать модель).
+
+#### 1.3 Permissions — владение, а не просто "автор"
+Отличие от прошлого блог-проекта: там был `IsAuthorOrReadOnly` (сравнение
+`obj.author == request.user`). Здесь товар принадлежит **магазину**, а не
+напрямую юзеру:
+```python
+class IsShopOwnerOrReadOnly(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        # obj — это Product; владение проверяем через obj.shop.owner
+        return obj.shop.owner_id == request.user.id
+```
+Обязательно напиши тест на это отдельно от happy-path: создай `Shop A`
+(owner = user A) с товаром, залогинься под `user B` (у которого свой
+магазин или вообще нет магазина), попробуй `PATCH` чужой товар — жди 403.
+Без такого теста легко случайно сломать permission при рефакторинге и не
+заметить (обычный список/детейл тест на "товар редактируется" пройдёт даже
+если permission вообще отключить).
+
+#### 1.4 Сериализаторы — раздели List и Detail с самого начала
+Не делай один `ProductSerializer` на всё. В списке товаров тебе не нужны
+все `variants` и полное `description` — это лишний вес ответа на каждый
+товар в пагинированном списке из 20 штук:
+```python
+class ProductListSerializer(serializers.ModelSerializer):
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    price = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ["id", "slug", "title", "shop_name", "price", "thumbnail", "is_published"]
+
+    def get_price(self, obj):
+        default_variant = obj.variants.filter(is_default=True).first()
+        return default_variant.get_effective_price() if default_variant else obj.base_price
+```
+**Осторожно:** `get_price` выше содержит N+1 сам по себе, если
+`obj.variants` не запрефетчен — `.filter().first()` на непрефетченном
+related manager всё равно уйдёт в БД отдельным запросом на каждый товар
+в списке. Правильно — прокинуть `Prefetch` с уже отфильтрованным
+queryset'ом на уровне вьюхи:
+```python
+from django.db.models import Prefetch
+
+queryset = Product.objects.select_related("shop", "category").prefetch_related(
+    Prefetch("variants", queryset=ProductVariant.objects.filter(is_default=True), to_attr="default_variant_list"),
+    "images",
+)
+```
+и в сериализаторе брать `obj.default_variant_list[0]` вместо `obj.variants.filter(...)`.
+Это тонкий момент, специально дал тебе его продумать — типичная ошибка:
+"я же сделал prefetch_related('variants'), почему всё равно N+1?" — потому
+что `.filter()` поверх уже загруженного `prefetch_related` без `Prefetch()`
+с явным queryset всё равно бьёт в БД заново.
+
+`ProductDetailSerializer` — отдельно, с полным списком `variants`,
+`images`, `description`, вложенным `shop` (мини-сериализатор с рейтингом).
+
+#### 1.5 Фильтры, поиск, сортировка — `django-filter`, а не руками в `get_queryset`
+```python
+class ProductFilter(filters.FilterSet):
+    category = filters.CharFilter(field_name="category__slug")
+    min_price = filters.NumberFilter(field_name="base_price", lookup_expr="gte")
+    max_price = filters.NumberFilter(field_name="base_price", lookup_expr="lte")
+    shop = filters.CharFilter(field_name="shop__slug")
+    in_stock = filters.BooleanFilter(method="filter_in_stock")
+
+    def filter_in_stock(self, queryset, name, value):
+        if value:
+            return queryset.filter(variants__stock__gt=0).distinct()
+        return queryset
+
+    class Meta:
+        model = Product
+        fields = ["category", "shop"]
+```
+Обрати внимание на `filter_in_stock` — фильтр по связанной таблице
+(`variants__stock__gt=0`) с `JOIN` может задублировать строки товара, если
+у товара несколько подходящих вариантов, отсюда `.distinct()`. Без него
+получишь один и тот же товар несколько раз в списке — баг, который легко
+не заметить на тестовых данных с одним вариантом на товар, и вылезет
+только на реальных данных.
+
+`OrderingFilter` — `ordering_fields = ["base_price", "created_at"]`,
+никогда не давай сортировать по произвольному полю без белого списка
+(`ordering_fields = "__all__"` — плохая идея, через `?ordering=` можно
+будет сортировать по внутренним/непроиндексированным полям и класть базу
+на больших таблицах).
+
+#### 1.6 Definition of done для Этапа 1
+- `IsShopOwnerOrReadOnly` покрыт тестом на 403 для чужого магазина, не
+  только happy-path.
+- Список товаров с 20+ штуками, вариантами и изображениями делает
+  **константное** число запросов независимо от количества товаров
+  (проверено через `django-debug-toolbar`, а не "на глаз").
+- Фильтр `in_stock` не дублирует товары в выдаче.
+- List и Detail сериализаторы разведены, List не тащит лишние поля.
+- `drf-spectacular` схема (`/api/schema/`) валидна и открывается без ошибок
+  (`ruff`/`manage.py spectacular --validate`, если такая команда есть в
+  твоей версии пакета — если нет, просто открой `/api/docs/` глазами).
 
 ### Этап 2 — Избранное и корзина (несколько дней)
 - Избранное для товаров и магазинов.

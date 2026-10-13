@@ -32,6 +32,7 @@ THIRD_PATRY_APPS = [
 
 LOCAL_APPS = [
     'apps.users',
+    'apps.shops',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PATRY_APPS + LOCAL_APPS
