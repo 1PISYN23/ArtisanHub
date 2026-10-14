@@ -90,3 +90,20 @@ class VerificationCode(models.Model):
 
     def is_expired(self):
         return self.expires_at < timezone.now()
+
+
+class Document(models.Model):
+    name = models.CharField(max_length=128, verbose_name="Название документа")
+    file = models.FileField(upload_to="documents/")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    class Meta:
+        verbose_name = "Документ"
+        verbose_name_plural = "Документы"
+
+    def __str__(self):
+        return self.name
+
+

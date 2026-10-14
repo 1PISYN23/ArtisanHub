@@ -139,7 +139,7 @@ class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
     def get_serializer_class(self):
-        if self.request == "PATCH":
+        if self.request.method == "PATCH":
             return ShopCreateUpdateSerlizer
         return ShopDetailSerizlier
 
@@ -183,5 +183,5 @@ class MyShopView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
 
-    def get_queryset(self):
-        return Shop.objects.filter(owner=self.request.user).select_related("owner")
+    def get_object(self):
+        return Shop.objects.select_related("owner").get(owner=self.request.user)
