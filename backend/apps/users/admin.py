@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin 
-from .models import CustomUser, VerificationCode, VerificationPurpose
+from .models import CustomUser, VerificationCode, VerificationPurpose, Document
 
 
 @admin.register(CustomUser)
@@ -12,7 +12,7 @@ class CustomUserAdmin(UserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Personal Info", {"fields": ("first_name", "last_name", "avatar", "phone")}),
+        ("Personal Info", {"fields": ("first_name", "last_name", "avatar", "phone", "personal_data_consent", "marketing_consent")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined")})
     )
@@ -72,3 +72,11 @@ class VerificationCodeAdmin(admin.ModelAdmin):
     def is_expired_status(self, obj):
         """Отображает статус протухания кода в виде иконки (галочка/крестик)"""
         return obj.is_expired()
+
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'file', 'created_at', 'updated_at')
+    search_fields = ('name',)
+    ordering = ('-created_at',)
+    readonly_fields = ('id', 'created_at', 'updated_at')
