@@ -21,7 +21,7 @@ class Shop(models.Model):
     reviews_count_cached = models.PositiveBigIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
-    create_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
