@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import generics, status, filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -132,7 +133,7 @@ class ShopsListCreateView(generics.ListCreateAPIView):
     )
 )
 class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Shop.objects.select_related("owner")
+    queryset = Shop.objects.filter(is_active=True).select_related("owner")
     serializer_class = ShopDetailSerizlier
     permission_classes = [IsOwnerOrReadOnly]
     lookup_field = "slug"

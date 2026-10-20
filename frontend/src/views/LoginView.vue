@@ -1,67 +1,54 @@
 <template>
-  <div class="auth-wrap">
-    <div class="auth-card">
-      <RouterLink to="/" class="brand">ArtisanHub</RouterLink>
-      <h1>С возвращением</h1>
-      <p class="sub">Войдите в свой аккаунт, чтобы продолжить</p>
-
-      <div v-if="error" class="alert error">{{ error }}</div>
-
-      <form @submit.prevent="handleSubmit">
-        <div class="field">
-          <label>Email</label>
-          <input v-model.trim="email" type="email" required autocomplete="email" placeholder="you@example.com" />
-        </div>
-        <div class="field">
-          <label>Пароль</label>
-          <input v-model="password" type="password" required autocomplete="current-password" placeholder="••••••••" />
-        </div>
-
-        <div class="row" style="margin-bottom: 20px">
-          <RouterLink to="/forgot-password" class="muted" style="font-size: .9rem">Забыли пароль?</RouterLink>
-        </div>
-
-        <button class="btn full" type="submit" :disabled="loading">
-          {{ loading ? 'Вход…' : 'Войти' }}
-        </button>
-      </form>
-
-      <div class="auth-footer">
-        Нет аккаунта? <RouterLink to="/register">Зарегистрироваться</RouterLink>
+  <div class="card">
+    <h2>Вход в аккаунт</h2>
+    <div v-if="error" class="alert alert-error">{{ error }}</div>
+    <form @submit.prevent="onSubmit" novalidate>
+      <div class="form-group">
+        <label>Email</label>
+        <input v-model.trim="form.email" type="email" required autocomplete="email" placeholder="you@example.com" />
       </div>
-    </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <PasswordInput v-model="form.password" required autocomplete="current-password" />
+      </div>
+      <button class="btn btn-block" :disabled="loading">{{ loading ? 'Вход...' : 'Войти' }}</button>
+    </form>
+    <p class="muted-link">
+      <RouterLink to="/forgot-password">Забыли пароль?</RouterLink>
+      <span> · </span>
+      <RouterLink to="/register">Регистрация</RouterLink>
+    </p>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-
-const email = ref('')
-const password = ref('')
-const error = ref('')
-const loading = ref(false)
+import { useAuthStore } from '../stores/auth'
+import { useToastStore } from '../stores/toast'
+import PasswordInput from '../components/PasswordInput.vue'
 
 const auth = useAuthStore()
+const toast = useToastStore()
 const router = useRouter()
 const route = useRoute()
+const form = reactive({ email: '', password: '' })
+const loading = ref(false)
+const error = ref('')
 
-async function handleSubmit() {
+async function onSubmit() {
   error.value = ''
   loading.value = true
   try {
-    await auth.login(email.value, password.value)
-    router.push(route.query.redirect || '/dashboard')
+    await auth.login(form)
+    toast.success('Добро пожаловать!')
+    router.push(route.query.redirect || { name: 'shops' })
   } catch (e) {
     const d = e.response?.data
-    error.value =
-      d?.detail ||
-      d?.non_field_errors?.[0] ||
-      d?.message ||
-      'Не удалось войти. Проверьте email и пароль.'
-  } finally {
-    loading.value = false
-  }
+    if (Array.isArray(d?.non_field_errors)) error.value = d.non_field_errors[0]
+    else if (typeof d?.detail === 'string') error.value = d.detail
+    else if (d && typeof d === 'object') error.value = Object.values(d).flat().join(' ')
+    else error.value = 'Не удалось войти. Проверьте соединение с сервером.'
+  } finally { loading.value = false }
 }
 </script>

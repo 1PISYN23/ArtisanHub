@@ -12,7 +12,7 @@ class ShopDetailSerizlier(serializers.ModelSerializer):
                   "description", "logo", "rating_cached", 
                   "reviews_count_cached", "created_at", "updated_at")
         read_only_fields = (
-            "id", "rating_cached", "reviews_count_cached", 
+            "id", "slug", "rating_cached", "reviews_count_cached", 
             "created_at", "updated_at"
         )
 
@@ -30,7 +30,7 @@ class MyShopSerializer(ShopDetailSerizlier):
 
     class Meta(ShopDetailSerizlier.Meta):
         fields = ShopDetailSerizlier.Meta.fields + ("owner", "stripe_account_id", "stripe_onboarding_complete")
-        read_only_fields = ShopDetailSerizlier.Meta.fields + ("owner", "stripe_account_id", "stripe_onboarding_complete")
+        read_only_fields = ShopDetailSerizlier.Meta.read_only_fields + ("owner", "stripe_account_id", "stripe_onboarding_complete")
 
 
 class ShopCreateUpdateSerlizer(serializers.ModelSerializer):
@@ -57,6 +57,12 @@ class ShopCreateUpdateSerlizer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                     "error": "Ваш email не подтвержен."
                 })  
+
+        if self.instance is None:
+            if hasattr(user, "shop"):
+                raise serializers.ValidationError({
+                    "error": "У вас уже есть созданный магазин."
+                })
 
         return attrs
 

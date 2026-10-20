@@ -1,94 +1,73 @@
 <template>
-  <div class="auth-wrap">
-    <div class="auth-card">
-      <RouterLink to="/" class="brand">ArtisanHub</RouterLink>
-      <h1>Подтвердите email</h1>
-      <p class="sub">
-        Мы отправили код на <strong>{{ email || 'ваш email' }}</strong>.
-        Введите его ниже.
-      </p>
-
-      <div v-if="error" class="alert error">{{ error }}</div>
-      <div v-if="info" class="alert info">{{ info }}</div>
-      <div v-if="success" class="alert success">{{ success }}</div>
-
-      <form @submit.prevent="handleVerify">
-        <div class="field" v-if="!email">
-          <label>Email</label>
-          <input v-model.trim="emailInput" type="email" required placeholder="you@example.com" />
+  <div class="card">
+    <h2>Подтверждение email</h2>
+    <div v-if="auth.user?.is_email_verified" class="alert alert-success">
+      ✅ Email уже подтверждён. <RouterLink to="/shops">К магазинам →</RouterLink>
+    </div>
+    <template v-else>
+      <p class="muted" style="margin-bottom:16px">Мы отправим 6-значный код на <b>{{ auth.user?.email }}</b></p>
+      <button class="btn btn-secondary btn-block" style="margin-bottom:16px"
+              @click="sendCode" :disabled="sending || cooldown > 0">
+        {{ cooldown > 0 ? `Повторно через ${cooldown}с` : sending ? 'Отправка...' : 'Отправить код' }}
+      </button>
+      <form @submit.prevent="verify" v-if="codeSent">
+        <div class="form-group">
+          <label>Код из письма</label>
+          <input v-model.trim="code" maxlength="6" inputmode="numeric" pattern="\d{6}"
+                 required placeholder="000000" class="code-input" />
         </div>
-
-        <div class="field">
-          <label>Код подтверждения</label>
-          <input v-model.trim="code" type="text" required placeholder="123456" inputmode="numeric" />
-        </div>
-
-        <button class="btn full" type="submit" :disabled="loading">
-          {{ loading ? 'Проверка…' : 'Подтвердить' }}
+        <button class="btn btn-block" :disabled="loading || code.length !== 6">
+          {{ loading ? 'Проверка...' : 'Подтвердить' }}
         </button>
       </form>
-
-      <div class="auth-footer">
-        <a href="#" @click.prevent="resend" :class="{ muted: resending }">
-          {{ resending ? 'Отправка…' : 'Отправить код повторно' }}
-        </a>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { ref, onUnmounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { authApi } from '../api/auth'
+import { useToastStore } from '../stores/toast'
 
-const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
-
-const emailFromQuery = route.query.email || auth.user?.email || ''
-const emailInput = ref('')
-const email = computed(() => emailFromQuery || emailInput.value)
+const toast = useToastStore()
 const code = ref('')
-const error = ref('')
-const info = ref('')
-const success = ref('')
+const codeSent = ref(false)
+const sending = ref(false)
 const loading = ref(false)
-const resending = ref(false)
+const cooldown = ref(0)
+let timer = null
 
-onMounted(async () => {
-  if (emailFromQuery && !code.value) {
-    await resend()
-  }
-})
-
-async function resend() {
-  if (!email.value) return
-  resending.value = true
-  error.value = ''
-  info.value = ''
-  try {
-    await auth.sendVerificationCode(email.value)
-    info.value = 'Код отправлен. Проверьте почту.'
-  } catch (e) {
-    error.value = 'Не удалось отправить код'
-  } finally {
-    resending.value = false
-  }
+function startCooldown(sec = 60) {
+  cooldown.value = sec
+  timer = setInterval(() => {
+    cooldown.value -= 1
+    if (cooldown.value <= 0) clearInterval(timer)
+  }, 1000)
 }
 
-async function handleVerify() {
-  error.value = ''
-  info.value = ''
+async function sendCode() {
+  sending.value = true
+  try {
+    await authApi.sendVerificationCode()
+    codeSent.value = true
+    toast.success('Код отправлен на email')
+    startCooldown(60)
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'Не удалось отправить код')
+  } finally { sending.value = false }
+}
+
+async function verify() {
   loading.value = true
   try {
-    await auth.verifyVerificationCode(email.value, code.value)
-    success.value = 'Email подтверждён! Перенаправляем…'
-    setTimeout(() => router.push('/dashboard'), 900)
+    await authApi.verifyEmail(code.value)
+    await auth.fetchProfile()
+    toast.success('Email подтверждён!')
   } catch (e) {
-    error.value = e.response?.data?.detail || 'Неверный код'
-  } finally {
-    loading.value = false
-  }
+    toast.error(e.response?.data?.code?.[0] || 'Неверный код')
+  } finally { loading.value = false }
 }
+onUnmounted(() => clearInterval(timer))
 </script>
