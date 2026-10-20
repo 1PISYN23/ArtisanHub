@@ -1,13 +1,18 @@
 <template>
-  <Navbar v-if="!isAuthPage" />
-  <RouterView />
+  <Navbar />
+  <main class="container">
+    <RouterView v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
+  </main>
+  <Footer />
+  <Toast />
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import Navbar from '@/components/Navbar.vue'
-
-const route = useRoute()
-const isAuthPage = computed(() => route.meta.layout === 'auth')
+import Navbar from './components/Navbar.vue'
+import Footer from './components/Footer.vue'
+import Toast from './components/Toast.vue'
 </script>

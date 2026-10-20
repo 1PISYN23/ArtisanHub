@@ -9,7 +9,7 @@ class Shop(models.Model):
         on_delete=models.CASCADE,
         related_name="shop"
     )
-    slug = models.SlugField(max_length=84, unique=True)
+    slug = models.SlugField(max_length=84, unique=True, allow_unicode=True)
     name = models.CharField(max_length=64, unique=True)
     description = models.TextField(max_length=528, blank=True)
     logo = models.ImageField(upload_to="shop_logos/", blank=True, null=True)
@@ -32,7 +32,7 @@ class Shop(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            self.slug = slugify(self.name, allow_unicode=True)
         super().save(*args, **kwargs)
         
 

@@ -21,7 +21,7 @@ class ShopAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "stripe_onboarding_complete", "created_at")
 
     # Поля, по которым можно искать (owner__username позволит искать по имени пользователя)
-    search_fields = ("name", "owner__username", "owner__email", "stripe_account_id")
+    search_fields = ("name", "owner__name", "owner__email", "stripe_account_id")
 
     # Автоматическое заполнение slug на основе name при создании в админке
     prepopulated_fields = {"slug": ("name",)}
