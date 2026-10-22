@@ -185,4 +185,4 @@ class MyShopView(generics.RetrieveUpdateAPIView):
 
 
     def get_object(self):
-        return Shop.objects.select_related("owner").get(owner=self.request.user)
+        return get_object_or_404(Shop.objects.select_related("owner"), owner=self.request.user)

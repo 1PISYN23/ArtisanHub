@@ -48,11 +48,6 @@ class ShopCreateUpdateSerlizer(serializers.ModelSerializer):
 
         user = request.user
 
-        if hasattr(user, "shop"):
-            raise serializers.ValidationError({
-                "error": "У вас уже есть созданный магазин."
-            })
-
         if not getattr(user, "is_email_verified", False):
             raise serializers.ValidationError({
                     "error": "Ваш email не подтвержен."
