@@ -33,7 +33,15 @@ THIRD_PATRY_APPS = [
 LOCAL_APPS = [
     'apps.users',
     'apps.shops',
+    'apps.catalog'
 ]
+
+
+# Домены, для которых нужно принудительно использовать HTTPS в URL изображений
+# Например: ['meridian.itfactory.site', 'example.com']
+FORCE_HTTPS_DOMAINS = os.getenv('FORCE_HTTPS_DOMAINS', '').split(',') if os.getenv('FORCE_HTTPS_DOMAINS') else []
+FORCE_HTTPS_DOMAINS = [domain.strip() for domain in FORCE_HTTPS_DOMAINS if domain.strip()]
+
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PATRY_APPS + LOCAL_APPS
 
